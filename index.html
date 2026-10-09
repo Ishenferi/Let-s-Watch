@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14161a">
+<title>Movie Picker</title>
+<style>
+  :root { --bg:#14161a; --card:#1e2127; --line:#2d3139; --text:#e8eaed; --muted:#9aa0a8; --accent:#e5a00d; --ok:#3fb27f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:12px 14px 60px; }
+  h1 { font-size:1.25rem; margin:6px 0 10px; }
+  h2 { font-size:0.95rem; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  nav { display:flex; gap:6px; margin-bottom:12px; }
+  nav button { flex:1; }
+  button { background:#2a2e36; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:1rem; cursor:pointer; }
+  button.primary { background:var(--accent); color:#111; border-color:var(--accent); font-weight:600; }
+  button.ok { background:var(--ok); color:#06150f; border-color:var(--ok); font-weight:600; }
+  button.active { border-color:var(--accent); color:var(--accent); }
+  button.big { width:100%; padding:14px; font-size:1.1rem; }
+  button.small { padding:6px 10px; font-size:.85rem; }
+  input, select { background:#14161a; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font-size:1rem; width:100%; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row > * { flex:1; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+  .chip { padding:5px 11px; border-radius:999px; border:1px solid var(--line); background:#2a2e36; font-size:.88rem; cursor:pointer; }
+  .chip.on { background:var(--accent); color:#111; border-color:var(--accent); }
+  .chip.cast { background:#2f3a52; border-color:#41537a; }
+  label { display:block; font-size:.85rem; color:var(--muted); margin:8px 0 4px; }
+  .suggest button { display:block; width:100%; text-align:left; margin-top:4px; padding:8px 10px; }
+  .movie { display:flex; gap:12px; }
+  .movie img { width:110px; height:165px; object-fit:cover; border-radius:8px; background:#14161a; flex:none; }
+  .movie h3 { margin:0 0 4px; font-size:1.1rem; }
+  .movie p { margin:6px 0 0; font-size:.9rem; }
+  .actions { display:flex; gap:8px; margin-top:12px; }
+  .actions button { flex:1; padding:12px; }
+  ul.plain { list-style:none; margin:0; padding:0; }
+  ul.plain li { padding:4px 0; }
+  .hist { display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--line); }
+  .hist:first-child { border-top:0; }
+  .hist img { width:44px; height:66px; object-fit:cover; border-radius:5px; background:#14161a; flex:none; }
+  .hist .t { flex:1; min-width:0; }
+  .stat { font-size:2rem; font-weight:700; color:var(--accent); line-height:1; }
+  .err { color:#ff8a80; margin:8px 0; }
+  .hidden { display:none; }
+  #toast { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:var(--ok); color:#06150f; padding:10px 16px; border-radius:10px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Movie Picker</h1>
+
+  <div class="card" style="display:flex; gap:16px; align-items:flex-start;">
+    <div>
+      <div class="muted">Total watched</div>
+      <div class="stat" id="total">0</div>
+    </div>
+    <div style="flex:1">
+      <div class="muted">Last 3</div>
+      <ul class="plain" id="last3"></ul>
+    </div>
+  </div>
+
+  <nav>
+    <button id="tab-pick" class="active">Pick</button>
+    <button id="tab-history">History</button>
+    <button id="tab-settings">Settings</button>
+  </nav>
+
+  <!-- PICK -->
+  <section id="view-pick">
+    <div class="card">
+      <h2>Genre</h2>
+      <div class="chips" id="genreChips"><span class="muted">Add your TMDB key in Settings to load genres.</span></div>
+      <label for="genreMode">Multiple genres match</label>
+      <select id="genreMode">
+        <option value="any">Any selected genre (OR)</option>
+        <option value="all">All selected genres (AND)</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h2>Release year</h2>
+      <div class="row">
+        <div><label for="yearFrom">From</label><input id="yearFrom" type="number" inputmode="numeric" placeholder="e.g. 1990" min="1888" max="2100"></div>
+        <div><label for="yearTo">To</label><input id="yearTo" type="number" inputmode="numeric" placeholder="e.g. 2024" min="1888" max="2100"></div>
+      </div>
+      <h2 style="margin-top:14px">Runtime (minutes)</h2>
+      <div class="row">
+        <div><label for="rtMin">Min</label><input id="rtMin" type="number" inputmode="numeric" placeholder="e.g. 80"></div>
+        <div><label for="rtMax">Max</label><input id="rtMax" type="number" inputmode="numeric" placeholder="e.g. 120"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Cast</h2>
+      <input id="castSearch" type="search" placeholder="Search actor or actress" autocomplete="off">
+      <div class="suggest" id="castSuggest"></div>
+      <div class="chips" id="castChips"></div>
+      <label for="castMode">Multiple cast members match</label>
+      <select id="castMode">
+        <option value="any">Any selected person (OR)</option>
+        <option value="all">All selected people together (AND)</option>
+      </select>
+    </div>
+
+    <button class="primary big" id="go">Let's Watch...</button>
+    <div class="err" id="pickErr"></div>
+
+    <div class="card hidden" id="result" style="margin-top:12px">
+      <div class="movie">
+        <img id="rPoster" alt="">
+        <div>
+          <h3 id="rTitle"></h3>
+          <div class="muted" id="rMeta"></div>
+          <p id="rOverview"></p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="actually">Actually...</button>
+        <button class="ok" id="good">Sounds good!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="view-history" class="hidden">
+    <div class="card">
+      <h2>Watch history</h2>
+      <input id="histFilter" type="search" placeholder="Filter history by title">
+      <div id="histList" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h2>Add a movie you already watched</h2>
+      <input id="addSearch" type="search" placeholder="Search by title" autocomplete="off">
+      <div class="suggest" id="addSuggest"></div>
+      <p class="muted">Adding a movie logs it as watched today and increments the total.</p>
+    </div>
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="row">
+        <button id="export">Export JSON</button>
+        <button id="importBtn">Import JSON</button>
+      </div>
+      <input id="importFile" type="file" accept="application/json" class="hidden">
+      <p class="muted">Browser storage can be cleared by the OS or browser. Export periodically.</p>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="view-settings" class="hidden">
+    <div class="card">
+      <h2>TMDB API key</h2>
+      <input id="apiKey" type="password" placeholder="v3 API key" autocomplete="off">
+      <p class="muted">Stored only in this browser. Not part of the page source.</p>
+      <h2 style="margin-top:14px">Minimum vote count (mainstream filter)</h2>
+      <input id="minVotes" type="number" inputmode="numeric" min="0">
+      <p class="muted">Higher values mean larger, more mainstream movies and exclude unrated titles. Default 1000. Lower it if narrow filters return nothing.</p>
+      <button class="primary" id="saveSettings">Save settings</button>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+(function () {
+  const $ = s => document.querySelector(s);
+  const KEY = 'moviepicker.v1';
+  const IMG = 'https://image.tmdb.org/t/p/';
+
+  let S = { apiKey: '', minVotes: 1000, history: [] };
+  try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const toast = msg => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); };
+  const yearOf = d => (d || '').slice(0, 4) || 'n/a';
+
+  async function api(path, params = {}) {
+    if (!S.apiKey) throw new Error('Add your TMDB API key in Settings.');
+    const q = new URLSearchParams(Object.assign({ api_key: S.apiKey, language: 'en-US' }, params));
+    const r = await fetch('https://api.themoviedb.org/3' + path + '?' + q);
+    if (!r.ok) throw new Error('TMDB request failed (' + r.status + ')' + (r.status === 401 ? ': check the API key.' : '.'));
+    return r.json();
+  }
+
+  /* ---------- tabs ---------- */
+  const views = ['pick', 'history', 'settings'];
+  function show(name) {
+    views.forEach(v => {
+      $('#view-' + v).classList.toggle('hidden', v !== name);
+      $('#tab-' + v).classList.toggle('active', v === name);
+    });
+    if (name === 'history') renderHistory();
+  }
+  views.forEach(v => $('#tab-' + v).addEventListener('click', () => show(v)));
+
+  /* ---------- stats ---------- */
+  function renderStats() {
+    $('#total').textContent = S.history.length;
+    const last = S.history.slice(0, 3);
+    $('#last3').innerHTML = last.length
+      ? last.map(h => '<li>' + esc(h.title) + ' (' + esc(h.year) + ') <span class="muted">' + new Date(h.watchedAt).toLocaleDateString() + '</span></li>').join('')
+      : '<li class="muted">None yet</li>';
+  }
+
+  /* ---------- genres ---------- */
+  const selGenres = new Set();
+  let genreMap = {};
+  async function loadGenres() {
+    if (!S.apiKey) return;
+    try {
+      const d = await api('/genre/movie/list');
+      genreMap = {};
+      d.genres.forEach(g => genreMap[g.id] = g.name);
+      $('#genreChips').innerHTML = d.genres.map(g => '<span class="chip" data-id="' + g.id + '">' + esc(g.name) + '</span>').join('');
+    } catch (e) { $('#genreChips').innerHTML = '<span class="err">' + esc(e.message) + '</span>'; }
+  }
+  $('#genreChips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    const id = c.dataset.id;
+    if (selGenres.has(id)) selGenres.delete(id); else selGenres.add(id);
+    c.classList.toggle('on', selGenres.has(id));
+  });
+
+  /* ---------- cast ---------- */
+  const selCast = new Map();
+  function renderCast() {
+    $('#castChips').innerHTML = [...selCast].map(([id, n]) => '<span class="chip cast on" data-id="' + id + '">' + esc(n) + ' &times;</span>').join('');
+  }
+  $('#castChips').addEventListener('click', e => {
+    const c = e.target.closest('.chip'); if (!c) return;
+    selCast.delete(c.dataset.id); renderCast();
+  });
+  const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  $('#castSearch').addEventListener('input', debounce(async e => {
+    const q = e.target.value.trim();
+    if (q.length < 2) { $('#castSuggest').innerHTML = ''; return; }
+    try {
+      const d = await api('/search/person', { query: q, include_adult: 'false' });
+      const acts = d.results.filter(p => p.known_for_department === 'Acting').slice(0, 5);
+      $('#castSuggest').innerHTML = acts.map(p => '<button data-id="' + p.id + '" data-name="' + esc(p.name) + '">' + esc(p.name) + '</button>').join('') || '<div class="muted">No matches.</div>';
+    } catch (err) { $('#castSuggest').innerHTML = '<div class="err">' + esc(err.message) + '</div>'; }
+  }, 300));
+  $('#castSuggest').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    selCast.set(b.dataset.id, b.dataset.name);
+    renderCast();
+    $('#castSuggest').innerHTML = ''; $('#castSearch').value = '';
+  });
+
+  /* ---------- discover and random pick ---------- */
+  function buildParams() {
+    const p = { include_adult: 'false', include_video: 'false', sort_by: 'popularity.desc', 'vote_count.gte': String(S.minVotes || 0) };
+    if (selGenres.size) p.with_genres = [...selGenres].join($('#genreMode').value === 'all' ? ',' : '|');
+    if (selCast.size) p.with_cast = [...selCast.keys()].join($('#castMode').value === 'all' ? ',' : '|');
+    const y1 = $('#yearFrom').value, y2 = $('#yearTo').value;
+    const today = new Date().toISOString().slice(0, 10);
+    if (y1) p['primary_release_date.gte'] = y1 + '-01-01';
+    let lte = y2 ? y2 + '-12-31' : today;
+    if (lte > today) lte = today;
+    p['primary_release_date.lte'] = lte;
+    if ($('#rtMin').value) p['with_runtime.gte'] = $('#rtMin').value;
+    if ($('#rtMax').value) p['with_runtime.lte'] = $('#rtMax').value;
+    return p;
+  }
+
+  let current = null;
+  const skipped = new Set();
+  const pageCache = new Map();
+  async function getPage(params, page) {
+    const k = JSON.stringify(params) + '|' + page;
+    if (!pageCache.has(k)) pageCache.set(k, await api('/discover/movie', Object.assign({}, params, { page })));
+    return pageCache.get(k);
+  }
+
+  async function pickMovie() {
+    const params = buildParams();
+    const first = await getPage(params, 1);
+    if (!first.total_results) return null;
+    const totalPages = Math.min(first.total_pages, 500);
+    const watched = new Set(S.history.map(h => h.id));
+    const tried = new Set();
+    while (tried.size < totalPages && tried.size < 12) {
+      let p;
+      do { p = 1 + Math.floor(Math.random() * totalPages); } while (tried.has(p));
+      tried.add(p);
+      const data = p === 1 ? first : await getPage(params, p);
+      const pool = data.results.filter(m => !watched.has(m.id) && !skipped.has(m.id));
+      if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+    }
+    // Fallback: exhaustive sweep over remaining pages (small result sets)
+    for (let p = 1; p <= totalPages; p++) {
+      if (tried.has(p)) continue;
+      const data = p === 1 ? first : await getPage(params, p);
+      const pool = data.results.filter(m => !watched.has(m.id) && !skipped.has(m.id));
+      if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+    }
+    return null;
+  }
+
+  async function run() {
+    $('#pickErr').textContent = '';
+    $('#go').disabled = true; $('#actually').disabled = true; $('#good').disabled = true;
+    try {
+      const m = await pickMovie();
+      if (!m) {
+        current = null;
+        $('#result').classList.add('hidden');
+        $('#pickErr').textContent = 'No unwatched movies match these criteria. Loosen the filters or lower the minimum vote count in Settings.';
+        return;
+      }
+      let rt = '', genres = '';
+      try {
+        const d = await api('/movie/' + m.id);
+        rt = d.runtime ? d.runtime + ' min' : '';
+        genres = (d.genres || []).map(g => g.name).join(', ');
+      } catch (e) {}
+      current = { id: m.id, title: m.title, year: yearOf(m.release_date), poster: m.poster_path || '' };
+      $('#rPoster').src = m.poster_path ? IMG + 'w342' + m.poster_path : '';
+      $('#rTitle').textContent = m.title + ' (' + current.year + ')';
+      $('#rMeta').textContent = [rt, 'TMDB ' + (m.vote_average || 0).toFixed(1) + ' (' + m.vote_count + ' votes)', genres].filter(Boolean).join(' | ');
+      $('#rOverview').textContent = m.overview || 'No synopsis available.';
+      $('#result').classList.remove('hidden');
+    } catch (e) {
+      $('#pickErr').textContent = e.message;
+    } finally {
+      $('#go').disabled = false; $('#actually').disabled = false; $('#good').disabled = false;
+    }
+  }
+
+  $('#go').addEventListener('click', () => { skipped.clear(); current = null; run(); });
+  $('#actually').addEventListener('click', () => { if (current) skipped.add(current.id); run(); });
+  $('#good').addEventListener('click', () => {
+    if (!current) return;
+    logWatch(current);
+    $('#result').classList.add('hidden');
+    current = null; skipped.clear();
+    toast('Logged as watched');
+  });
+
+  function logWatch(m) {
+    S.history = S.history.filter(h => h.id !== m.id);
+    S.history.unshift({ id: m.id, title: m.title, year: m.year, poster: m.poster, watchedAt: Date.now() });
+    save(); renderStats(); renderHistory();
+  }
+
+  /* ---------- history ---------- */
+  function renderHistory() {
+    const f = $('#histFilter').value.trim().toLowerCase();
+    const items = S.history.filter(h => !f || h.title.toLowerCase().includes(f));
+    $('#histList').innerHTML = items.length ? items.map(h =>
+      '<div class="hist">' +
+      (h.poster ? '<img src="' + IMG + 'w92' + h.poster + '" alt="">' : '<img alt="">') +
+      '<div class="t"><div>' + esc(h.title) + ' (' + esc(h.year) + ')</div><div class="muted">' + new Date(h.watchedAt).toLocaleDateString() + '</div></div>' +
+      '<button class="small" data-rm="' + h.id + '">Remove</button></div>'
+    ).join('') : '<div class="muted">No history to show.</div>';
+  }
+  $('#histFilter').addEventListener('input', renderHistory);
+  $('#histList').addEventListener('click', e => {
+    const b = e.target.closest('[data-rm]'); if (!b) return;
+    const id = Number(b.dataset.rm);
+    const h = S.history.find(x => x.id === id);
+    if (h && confirm('Remove "' + h.title + '" from history? It will become eligible for random picks again.')) {
+      S.history = S.history.filter(x => x.id !== id);
+      save(); renderStats(); renderHistory();
+    }
+  });
+
+  $('#addSearch').addEventListener('input', debounce(async e => {
+    const q = e.target.value.trim();
+    if (q.length < 2) { $('#addSuggest').innerHTML = ''; return; }
+    try {
+      const d = await api('/search/movie', { query: q, include_adult: 'false' });
+      $('#addSuggest').innerHTML = d.results.slice(0, 6).map(m =>
+        '<button data-id="' + m.id + '" data-title="' + esc(m.title) + '" data-year="' + yearOf(m.release_date) + '" data-poster="' + esc(m.poster_path || '') + '">' + esc(m.title) + ' (' + yearOf(m.release_date) + ')</button>'
+      ).join('') || '<div class="muted">No matches.</div>';
+    } catch (err) { $('#addSuggest').innerHTML = '<div class="err">' + esc(err.message) + '</div>'; }
+  }, 300));
+  $('#addSuggest').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    logWatch({ id: Number(b.dataset.id), title: b.dataset.title, year: b.dataset.year, poster: b.dataset.poster });
+    $('#addSuggest').innerHTML = ''; $('#addSearch').value = '';
+    toast('Added to history');
+  });
+
+  $('#export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ history: S.history }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'movie-history-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $('#importBtn').addEventListener('click', () => $('#importFile').click());
+  $('#importFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      const incoming = Array.isArray(data.history) ? data.history : [];
+      const have = new Set(S.history.map(h => h.id));
+      let added = 0;
+      incoming.forEach(h => { if (h && h.id && !have.has(h.id)) { S.history.push(h); have.add(h.id); added++; } });
+      S.history.sort((a, b) => b.watchedAt - a.watchedAt);
+      save(); renderStats(); renderHistory();
+      toast('Imported ' + added + ' new');
+    } catch (err) { alert('Import failed: invalid JSON file.'); }
+    e.target.value = '';
+  });
+
+  /* ---------- settings ---------- */
+  $('#apiKey').value = S.apiKey;
+  $('#minVotes').value = S.minVotes;
+  $('#saveSettings').addEventListener('click', async () => {
+    S.apiKey = $('#apiKey').value.trim();
+    S.minVotes = Math.max(0, parseInt($('#minVotes').value, 10) || 0);
+    save(); pageCache.clear();
+    await loadGenres();
+    toast('Settings saved');
+    show('pick');
+  });
+
+  /* ---------- init ---------- */
+  renderStats();
+  loadGenres();
+  if (!S.apiKey) show('settings');
+})();
+</script>
+</body>
+</html>
